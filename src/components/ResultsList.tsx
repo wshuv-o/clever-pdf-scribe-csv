@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface ResultsListProps {
   results: SearchResult[];
@@ -32,9 +33,13 @@ const ResultsList: React.FC<ResultsListProps> = ({ results, onExport }) => {
         {results.map((result) => (
           <Card key={result.id}>
             <CardHeader className="py-3">
-              <CardTitle className="text-sm font-medium flex items-center">
-                <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
-                Page {result.pageNumber}
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <div className="flex items-center">
+                  <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <span className="mr-2">{result.fileName}</span> -
+                  <span className="ml-2">Page {result.pageNumber}</span>
+                </div>
+                <Badge variant="outline" className="ml-2">Next word: {result.nextWord || "N/A"}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="py-3 text-sm">

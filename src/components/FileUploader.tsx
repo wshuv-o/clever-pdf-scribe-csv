@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { Upload } from 'lucide-react';
 
 interface FileUploaderProps {
-  onFileUpload: (file: File) => void;
+  onFileUpload: (files: File[]) => void;
   isLoading: boolean;
 }
 
@@ -13,9 +13,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUpload, isLoading }) 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        if (file.type === 'application/pdf') {
-          onFileUpload(file);
+        const pdfFiles = acceptedFiles.filter(file => file.type === 'application/pdf');
+        if (pdfFiles.length > 0) {
+          onFileUpload(pdfFiles);
         }
       }
     },
@@ -27,8 +27,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUpload, isLoading }) 
     accept: {
       'application/pdf': ['.pdf'],
     },
-    maxFiles: 1,
     disabled: isLoading,
+    multiple: true,
   });
 
   return (
@@ -46,10 +46,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUpload, isLoading }) 
         <Upload className="w-8 h-8 text-gray-400" />
         <p className="text-sm text-gray-600">
           {isDragActive
-            ? 'Drop the PDF file here'
+            ? 'Drop the PDF files here'
             : isLoading
             ? 'Processing...'
-            : 'Drag & drop a PDF file here, or click to select one'}
+            : 'Drag & drop PDF files here, or click to select files'}
         </p>
         <p className="text-xs text-gray-500">Only PDF files are supported</p>
       </div>
