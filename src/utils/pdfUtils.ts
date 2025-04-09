@@ -1,5 +1,8 @@
 
-import pdfParse from 'pdf-parse';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set the worker source for PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export interface SearchResult {
   id: string;
@@ -12,9 +15,29 @@ export interface SearchResult {
 
 export async function parsePdf(file: File): Promise<string> {
   try {
+    // Read the file as an array buffer
     const arrayBuffer = await file.arrayBuffer();
-    const data = await pdfParse(Buffer.from(arrayBuffer));
-    return data.text;
+    
+    // Load the PDF document
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    
+    // Get the total number of pages
+    const numPages = pdf.numPages;
+    
+    // Extract text from each page
+    let fullText = '';
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str)
+        .join(' ');
+      
+      fullText += pageText + '\n\n\n'; // Adding page separators
+    }
+    
+    return fullText;
   } catch (error) {
     console.error('Error parsing PDF:', error);
     throw new Error('Failed to parse PDF file.');
