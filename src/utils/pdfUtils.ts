@@ -103,7 +103,6 @@ export function searchInText(pdfContents: PdfContent[], searchTerms: string[]): 
   
   pdfContents.forEach((pdfContent, fileIndex) => {
     const { fileName, text } = pdfContent;
-    const normalizedText = text.toLowerCase();
     
     // Split text into pages (approximation)
     const pages = text.split('\n\n\n').filter(Boolean);

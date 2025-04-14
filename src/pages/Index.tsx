@@ -23,6 +23,8 @@ const Index = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploader, setShowUploader] = useState(true);
+  const [activeKeyword, setActiveKeyword] = useState<string | undefined>(undefined);
+  const [activePdfIndex, setActivePdfIndex] = useState<number | undefined>(undefined);
 
   const handleFileUpload = async (files: File[]) => {
     setIsProcessing(true);
@@ -65,6 +67,8 @@ const Index = () => {
     try {
       const results = searchInText(pdfContents, searchTerms);
       setSearchResults(results);
+      setActiveKeyword(undefined);
+      setActivePdfIndex(undefined);
       
       if (results.length === 0) {
         toast({
@@ -109,6 +113,10 @@ const Index = () => {
     }
   };
 
+  const handlePdfSelect = (index: number) => {
+    setActivePdfIndex(activePdfIndex === index ? undefined : index);
+  };
+
   return (
     <div className="min-h-screen bg-[#0d1117] flex flex-col">
       {/* Header */}
@@ -131,16 +139,6 @@ const Index = () => {
                   Upload PDFs
                 </Button>
               </>
-            )}
-            
-            {searchResults.length > 0 && (
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 bg-[#171923] border-gray-700 text-gray-300 hover:bg-gray-800"
-                onClick={handleExport}
-              >
-                Export
-              </Button>
             )}
           </div>
         </div>
@@ -178,12 +176,19 @@ const Index = () => {
               <ResultsList 
                 results={searchResults}
                 onExport={handleExport}
+                activeKeyword={activeKeyword}
+                setActiveKeyword={setActiveKeyword}
+                activePdfIndex={activePdfIndex}
               />
             </div>
             
             {/* Main Content - PDF Viewer */}
             <div className="flex-1 p-4 overflow-hidden">
-              <PDFViewer fileNames={fileNames} />
+              <PDFViewer 
+                fileNames={fileNames} 
+                onFileSelect={handlePdfSelect}
+                activePdfIndex={activePdfIndex}
+              />
             </div>
           </div>
         )}

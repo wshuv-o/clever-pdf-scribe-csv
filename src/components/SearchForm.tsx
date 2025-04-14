@@ -68,7 +68,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) => {
         
         <Input
           type="text"
-          placeholder="Add another term..."
+          placeholder="Add search term..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -77,13 +77,24 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) => {
         />
         
         <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleAddTerm}
+          disabled={!searchInput.trim() || isLoading}
+          className="text-gray-300"
+        >
+          Add
+        </Button>
+        
+        <Button
           type="submit"
           variant="ghost"
           size="sm"
           disabled={searchTerms.length === 0 || isLoading}
           className="text-gray-300"
         >
-          <X className="w-4 h-4" />
+          Search
         </Button>
       </div>
     </form>

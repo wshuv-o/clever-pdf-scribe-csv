@@ -2,23 +2,37 @@
 import React, { useState } from 'react';
 import { SearchResult } from '@/utils/pdfUtils';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ResultsListProps {
   results: SearchResult[];
   onExport: () => void;
+  activeKeyword?: string;
+  setActiveKeyword: (keyword: string | undefined) => void;
+  activePdfIndex?: number;
 }
 
-const ResultsList: React.FC<ResultsListProps> = ({ results, onExport }) => {
+const ResultsList: React.FC<ResultsListProps> = ({ 
+  results, 
+  onExport, 
+  activeKeyword, 
+  setActiveKeyword,
+  activePdfIndex
+}) => {
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
   
   if (results.length === 0) {
     return null;
   }
   
+  // Filter results by active PDF if set
+  const filteredResults = activePdfIndex !== undefined 
+    ? results.filter(result => result.fileIndex === activePdfIndex)
+    : results;
+  
   // Group results by search term
-  const groupedResults = results.reduce<Record<string, SearchResult[]>>((acc, result) => {
+  const groupedResults = filteredResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
     if (!acc[result.match]) {
       acc[result.match] = [];
     }
@@ -43,53 +57,58 @@ const ResultsList: React.FC<ResultsListProps> = ({ results, onExport }) => {
       </div>
       
       <div className="space-y-6 p-4 overflow-y-auto">
-        {Object.entries(groupedResults).map(([term, termResults]) => (
-          <div key={term} className="space-y-2">
-            <div className={`px-2 py-1 rounded-full text-xs font-medium inline-flex items-center 
-              ${term === 'hey' ? 'bg-blue-500' : 
-                term === 'how' ? 'bg-green-500' : 
-                term === 'where' ? 'bg-amber-500' : 
-                term === 'good' ? 'bg-purple-500' : 'bg-pink-500'}`}>
-              {term} ({termResults.length})
-            </div>
-            
-            {termResults.map((result) => (
+        {Object.entries(groupedResults)
+          .filter(([term, _]) => !activeKeyword || term === activeKeyword)
+          .map(([term, termResults]) => (
+            <div key={term} className="space-y-2">
               <div 
-                key={result.id} 
-                className="rounded-md bg-[#171923] border border-gray-800 overflow-hidden"
+                className={`px-2 py-1 rounded-full text-xs font-medium inline-flex items-center cursor-pointer
+                  ${term === 'hey' ? 'bg-blue-500' : 
+                    term === 'how' ? 'bg-green-500' : 
+                    term === 'where' ? 'bg-amber-500' : 
+                    term === 'good' ? 'bg-purple-500' : 'bg-pink-500'}`}
+                onClick={() => setActiveKeyword(activeKeyword === term ? undefined : term)}
               >
-                <div 
-                  className="p-3 flex items-center justify-between cursor-pointer"
-                  onClick={() => toggleExpand(result.id)}
-                >
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 mr-2 text-gray-400" />
-                    <span className="text-sm text-gray-200">Page {result.pageNumber}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">Next word: {result.nextWord || "N/A"}</span>
-                    <Button variant="ghost" size="sm" className="p-0 h-auto">
-                      {expandedResult === result.id ? 
-                        <ChevronUp className="w-4 h-4" /> : 
-                        <ChevronDown className="w-4 h-4" />
-                      }
-                    </Button>
-                  </div>
-                </div>
-                
-                {expandedResult === result.id && (
-                  <div className="p-3 border-t border-gray-800 text-sm">
-                    <p className="whitespace-pre-wrap text-gray-300">
-                      <span>{result.beforeMatch}</span>{' '}
-                      <span className={cn("bg-blue-500/30 px-1 rounded text-white font-medium")}>{result.match}</span>{' '}
-                      <span>{result.afterMatch}</span>
-                    </p>
-                  </div>
-                )}
+                {term} ({termResults.length})
               </div>
-            ))}
-          </div>
-        ))}
+              
+              {termResults.map((result) => (
+                <div 
+                  key={result.id} 
+                  className="rounded-md bg-[#171923] border border-gray-800 overflow-hidden"
+                >
+                  <div 
+                    className="p-3 flex items-center justify-between cursor-pointer"
+                    onClick={() => toggleExpand(result.id)}
+                  >
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2 text-gray-400" />
+                      <span className="text-sm text-gray-200">Page {result.pageNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400">Next word: {result.nextWord || "N/A"}</span>
+                      <Button variant="ghost" size="sm" className="p-0 h-auto">
+                        {expandedResult === result.id ? 
+                          <ChevronUp className="w-4 h-4" /> : 
+                          <ChevronDown className="w-4 h-4" />
+                        }
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {expandedResult === result.id && (
+                    <div className="p-3 border-t border-gray-800 text-sm">
+                      <p className="whitespace-pre-wrap text-gray-300">
+                        <span>{result.beforeMatch}</span>{' '}
+                        <span className={cn("bg-blue-500/30 px-1 rounded text-white font-medium")}>{result.match}</span>{' '}
+                        <span>{result.afterMatch}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
       </div>
     </div>
   );
