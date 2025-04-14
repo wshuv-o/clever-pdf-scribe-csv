@@ -23,7 +23,7 @@ const Index = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUploader, setShowUploader] = useState(true);
-  const [activeKeyword, setActiveKeyword] = useState<string | undefined>(undefined);
+  const [activeKeywords, setActiveKeywords] = useState<string[]>([]);
   const [activePdfIndex, setActivePdfIndex] = useState<number | undefined>(undefined);
 
   const handleFileUpload = async (files: File[]) => {
@@ -67,8 +67,7 @@ const Index = () => {
     try {
       const results = searchInText(pdfContents, searchTerms);
       setSearchResults(results);
-      setActiveKeyword(undefined);
-      setActivePdfIndex(undefined);
+      setActiveKeywords([]);
       
       if (results.length === 0) {
         toast({
@@ -96,7 +95,18 @@ const Index = () => {
     if (searchResults.length === 0) return;
     
     try {
-      const csvContent = convertToCSV(searchResults);
+      // Filter results based on active PDF and keywords if applicable
+      let resultsToExport = searchResults;
+      
+      if (activePdfIndex !== undefined) {
+        resultsToExport = resultsToExport.filter(result => result.fileIndex === activePdfIndex);
+      }
+      
+      if (activeKeywords.length > 0) {
+        resultsToExport = resultsToExport.filter(result => activeKeywords.includes(result.match));
+      }
+      
+      const csvContent = convertToCSV(resultsToExport);
       const exportFileName = `pdf_search_results.csv`;
       downloadCSV(csvContent, exportFileName);
       
@@ -113,8 +123,8 @@ const Index = () => {
     }
   };
 
-  const handlePdfSelect = (index: number) => {
-    setActivePdfIndex(activePdfIndex === index ? undefined : index);
+  const handlePdfSelect = (index: number | undefined) => {
+    setActivePdfIndex(index);
   };
 
   return (
@@ -176,8 +186,8 @@ const Index = () => {
               <ResultsList 
                 results={searchResults}
                 onExport={handleExport}
-                activeKeyword={activeKeyword}
-                setActiveKeyword={setActiveKeyword}
+                activeKeywords={activeKeywords}
+                setActiveKeywords={setActiveKeywords}
                 activePdfIndex={activePdfIndex}
               />
             </div>

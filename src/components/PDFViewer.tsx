@@ -4,7 +4,7 @@ import React from 'react';
 interface PDFViewerProps {
   fileNames: string[];
   activeFile?: string;
-  onFileSelect?: (fileIndex: number) => void;
+  onFileSelect?: (fileIndex: number | undefined) => void;
   activePdfIndex?: number;
 }
 
@@ -43,6 +43,14 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       
       {fileNames.length > 0 && (
         <div className="flex items-center justify-center p-2 bg-[#171923] border-t border-gray-800 gap-2 overflow-x-auto">
+          <div 
+            className={`p-2 rounded-md text-xs cursor-pointer ${
+              activePdfIndex === undefined ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:bg-gray-800'
+            }`}
+            onClick={() => onFileSelect && onFileSelect(undefined)}
+          >
+            All
+          </div>
           {fileNames.map((name, index) => (
             <div 
               key={index}

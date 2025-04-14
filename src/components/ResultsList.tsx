@@ -4,20 +4,21 @@ import { SearchResult } from '@/utils/pdfUtils';
 import { Button } from '@/components/ui/button';
 import { Download, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ResultsListProps {
   results: SearchResult[];
   onExport: () => void;
-  activeKeyword?: string;
-  setActiveKeyword: (keyword: string | undefined) => void;
+  activeKeywords: string[];
+  setActiveKeywords: (keywords: string[]) => void;
   activePdfIndex?: number;
 }
 
 const ResultsList: React.FC<ResultsListProps> = ({ 
   results, 
   onExport, 
-  activeKeyword, 
-  setActiveKeyword,
+  activeKeywords, 
+  setActiveKeywords,
   activePdfIndex
 }) => {
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
@@ -25,14 +26,22 @@ const ResultsList: React.FC<ResultsListProps> = ({
   if (results.length === 0) {
     return null;
   }
+
+  // Get unique keywords from results
+  const allKeywords = Array.from(new Set(results.map(result => result.match)));
   
   // Filter results by active PDF if set
   const filteredResults = activePdfIndex !== undefined 
     ? results.filter(result => result.fileIndex === activePdfIndex)
     : results;
   
+  // Filter by active keywords if any are selected
+  const keywordFilteredResults = activeKeywords.length > 0
+    ? filteredResults.filter(result => activeKeywords.includes(result.match))
+    : filteredResults;
+  
   // Group results by search term
-  const groupedResults = filteredResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
+  const groupedResults = keywordFilteredResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
     if (!acc[result.match]) {
       acc[result.match] = [];
     }
@@ -42,6 +51,26 @@ const ResultsList: React.FC<ResultsListProps> = ({
 
   const toggleExpand = (id: string) => {
     setExpandedResult(expandedResult === id ? null : id);
+  };
+
+  const toggleKeyword = (keyword: string) => {
+    if (activeKeywords.includes(keyword)) {
+      setActiveKeywords(activeKeywords.filter(k => k !== keyword));
+    } else {
+      setActiveKeywords([...activeKeywords, keyword]);
+    }
+  };
+
+  // Consistent color mapping for keywords
+  const getKeywordColorClass = (term: string) => {
+    const index = allKeywords.indexOf(term) % 5;
+    return [
+      'bg-blue-500',
+      'bg-green-500',
+      'bg-amber-500',
+      'bg-purple-500',
+      'bg-pink-500'
+    ][index];
   };
 
   return (
@@ -56,59 +85,74 @@ const ResultsList: React.FC<ResultsListProps> = ({
         </Button>
       </div>
       
-      <div className="space-y-6 p-4 overflow-y-auto">
-        {Object.entries(groupedResults)
-          .filter(([term, _]) => !activeKeyword || term === activeKeyword)
-          .map(([term, termResults]) => (
-            <div key={term} className="space-y-2">
-              <div 
-                className={`px-2 py-1 rounded-full text-xs font-medium inline-flex items-center cursor-pointer
-                  ${term === 'hey' ? 'bg-blue-500' : 
-                    term === 'how' ? 'bg-green-500' : 
-                    term === 'where' ? 'bg-amber-500' : 
-                    term === 'good' ? 'bg-purple-500' : 'bg-pink-500'}`}
-                onClick={() => setActiveKeyword(activeKeyword === term ? undefined : term)}
-              >
-                {term} ({termResults.length})
-              </div>
-              
-              {termResults.map((result) => (
-                <div 
-                  key={result.id} 
-                  className="rounded-md bg-[#171923] border border-gray-800 overflow-hidden"
-                >
-                  <div 
-                    className="p-3 flex items-center justify-between cursor-pointer"
-                    onClick={() => toggleExpand(result.id)}
-                  >
-                    <div className="flex items-center">
-                      <FileText className="w-4 h-4 mr-2 text-gray-400" />
-                      <span className="text-sm text-gray-200">Page {result.pageNumber}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">Next word: {result.nextWord || "N/A"}</span>
-                      <Button variant="ghost" size="sm" className="p-0 h-auto">
-                        {expandedResult === result.id ? 
-                          <ChevronUp className="w-4 h-4" /> : 
-                          <ChevronDown className="w-4 h-4" />
-                        }
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {expandedResult === result.id && (
-                    <div className="p-3 border-t border-gray-800 text-sm">
-                      <p className="whitespace-pre-wrap text-gray-300">
-                        <span>{result.beforeMatch}</span>{' '}
-                        <span className={cn("bg-blue-500/30 px-1 rounded text-white font-medium")}>{result.match}</span>{' '}
-                        <span>{result.afterMatch}</span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+      <div className="p-4 border-b border-gray-800 overflow-x-auto">
+        <h3 className="text-sm text-gray-400 mb-2">Filter by keywords:</h3>
+        <div className="flex flex-wrap gap-2">
+          {allKeywords.map((keyword) => (
+            <div
+              key={keyword}
+              className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer flex items-center gap-1 ${
+                getKeywordColorClass(keyword)
+              } ${
+                !activeKeywords.includes(keyword) && activeKeywords.length > 0 
+                  ? 'opacity-50' 
+                  : ''
+              }`}
+              onClick={() => toggleKeyword(keyword)}
+            >
+              <span>{keyword}</span>
+              <span className="ml-1">({results.filter(r => r.match === keyword).length})</span>
             </div>
           ))}
+        </div>
+      </div>
+      
+      <div className="flex-1 space-y-6 p-4 overflow-y-auto">
+        {Object.entries(groupedResults).map(([term, termResults]) => (
+          <div key={term} className="space-y-2">
+            <div 
+              className={`px-2 py-1 rounded-full text-xs font-medium inline-flex items-center ${getKeywordColorClass(term)}`}
+            >
+              {term} ({termResults.length})
+            </div>
+            
+            {termResults.map((result) => (
+              <div 
+                key={result.id} 
+                className="rounded-md bg-[#171923] border border-gray-800 overflow-hidden"
+              >
+                <div 
+                  className="p-3 flex items-center justify-between cursor-pointer"
+                  onClick={() => toggleExpand(result.id)}
+                >
+                  <div className="flex items-center">
+                    <FileText className="w-4 h-4 mr-2 text-gray-400" />
+                    <span className="text-sm text-gray-200">Page {result.pageNumber}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400">Next word: {result.nextWord || "N/A"}</span>
+                    <Button variant="ghost" size="sm" className="p-0 h-auto">
+                      {expandedResult === result.id ? 
+                        <ChevronUp className="w-4 h-4" /> : 
+                        <ChevronDown className="w-4 h-4" />
+                      }
+                    </Button>
+                  </div>
+                </div>
+                
+                {expandedResult === result.id && (
+                  <div className="p-3 border-t border-gray-800 text-sm">
+                    <p className="whitespace-pre-wrap text-gray-300">
+                      <span>{result.beforeMatch}</span>{' '}
+                      <span className={cn("px-1 rounded text-white font-medium", getKeywordColorClass(result.match))}>{result.match}</span>{' '}
+                      <span>{result.afterMatch}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
