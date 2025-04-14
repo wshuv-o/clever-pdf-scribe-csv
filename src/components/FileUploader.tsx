@@ -35,23 +35,23 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUpload, isLoading }) 
     <div
       {...getRootProps()}
       className={cn(
-        'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-        isDragActive ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400',
-        isDragReject && 'border-red-500 bg-red-50',
-        isLoading && 'opacity-50 cursor-not-allowed'
+        'border border-dashed rounded-md p-6 text-center cursor-pointer transition-colors',
+        isDragActive ? 'border-primary bg-primary/5' : 'border-gray-600 hover:border-gray-500',
+        isDragReject && 'border-red-500 bg-red-500/10',
+        isLoading && 'opacity-50 cursor-not-allowed',
+        'flex flex-col items-center justify-center'
       )}
     >
       <input {...getInputProps()} />
       <div className="flex flex-col items-center justify-center gap-2">
-        <Upload className="w-8 h-8 text-gray-400" />
-        <p className="text-sm text-gray-600">
+        <Upload className="w-5 h-5 text-gray-400" />
+        <p className="text-sm text-gray-300">
           {isDragActive
             ? 'Drop the PDF files here'
             : isLoading
             ? 'Processing...'
-            : 'Drag & drop PDF files here, or click to select files'}
+            : 'Upload PDFs'}
         </p>
-        <p className="text-xs text-gray-500">Only PDF files are supported</p>
       </div>
     </div>
   );
