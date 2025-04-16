@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import FileUploader from '@/components/FileUploader';
@@ -12,7 +11,9 @@ import {
   convertToCSV, 
   downloadCSV, 
   SearchResult,
-  PdfContent
+  PdfContent,
+  toggleHighlight,
+  updateNextWord
 } from '@/utils/pdfUtils';
 import { Button } from '@/components/ui/button';
 
@@ -89,6 +90,19 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleToggleHighlight = (resultId: string) => {
+    setSearchResults(prevResults => toggleHighlight(prevResults, resultId));
+  };
+
+  const handleUpdateNextWord = (resultId: string, newWord: string) => {
+    setSearchResults(prevResults => updateNextWord(prevResults, resultId, newWord));
+    
+    toast({
+      title: 'Next word updated',
+      description: `Next word has been updated to "${newWord}"`,
+    });
   };
 
   const handleExport = () => {
@@ -189,6 +203,8 @@ const Index = () => {
                 activeKeywords={activeKeywords}
                 setActiveKeywords={setActiveKeywords}
                 activePdfIndex={activePdfIndex}
+                onToggleHighlight={handleToggleHighlight}
+                onUpdateNextWord={handleUpdateNextWord}
               />
             </div>
             
@@ -198,6 +214,10 @@ const Index = () => {
                 fileNames={fileNames} 
                 onFileSelect={handlePdfSelect}
                 activePdfIndex={activePdfIndex}
+                searchResults={searchResults}
+                activeKeywords={activeKeywords}
+                onToggleHighlight={handleToggleHighlight}
+                onUpdateNextWord={handleUpdateNextWord}
               />
             </div>
           </div>

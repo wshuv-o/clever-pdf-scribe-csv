@@ -13,6 +13,7 @@ export interface SearchResult {
   afterMatch: string;
   nextWord: string;
   fullContext: string;
+  isHighlighted?: boolean;
 }
 
 export interface PdfContent {
@@ -144,6 +145,7 @@ export function searchInText(
             afterMatch,
             nextWord,
             fullContext,
+            isHighlighted: true
           });
 
           index = matchEnd;
@@ -153,6 +155,31 @@ export function searchInText(
   });
 
   return results;
+}
+
+export function updateNextWord(
+  results: SearchResult[], 
+  resultId: string, 
+  newNextWord: string
+): SearchResult[] {
+  return results.map(result => {
+    if (result.id === resultId) {
+      return { ...result, nextWord: newNextWord };
+    }
+    return result;
+  });
+}
+
+export function toggleHighlight(
+  results: SearchResult[], 
+  resultId: string
+): SearchResult[] {
+  return results.map(result => {
+    if (result.id === resultId) {
+      return { ...result, isHighlighted: !result.isHighlighted };
+    }
+    return result;
+  });
 }
 
 export function convertToCSV(results: SearchResult[]): string {

@@ -4,7 +4,6 @@ import { SearchResult } from '@/utils/pdfUtils';
 import { Button } from '@/components/ui/button';
 import { Download, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface ResultsListProps {
   results: SearchResult[];
@@ -12,6 +11,8 @@ interface ResultsListProps {
   activeKeywords: string[];
   setActiveKeywords: (keywords: string[]) => void;
   activePdfIndex?: number;
+  onToggleHighlight: (resultId: string) => void;
+  onUpdateNextWord: (resultId: string, newWord: string) => void;
 }
 
 const ResultsList: React.FC<ResultsListProps> = ({ 
@@ -19,7 +20,9 @@ const ResultsList: React.FC<ResultsListProps> = ({
   onExport, 
   activeKeywords, 
   setActiveKeywords,
-  activePdfIndex
+  activePdfIndex,
+  onToggleHighlight,
+  onUpdateNextWord
 }) => {
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
   
@@ -130,7 +133,23 @@ const ResultsList: React.FC<ResultsListProps> = ({
                     <span className="text-sm text-gray-200">Page {result.pageNumber}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">Next word: {result.nextWord || "N/A"}</span>
+                    <div className="flex items-center">
+                      <span className="text-xs text-gray-400 mr-1">Next word:</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${result.isHighlighted ? 'bg-amber-600' : 'bg-gray-700'}`}>
+                        {result.nextWord || "N/A"}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-1 h-auto ml-1 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleHighlight(result.id);
+                        }}
+                      >
+                        {result.isHighlighted ? 'Unmark' : 'Mark'}
+                      </Button>
+                    </div>
                     <Button variant="ghost" size="sm" className="p-0 h-auto">
                       {expandedResult === result.id ? 
                         <ChevronUp className="w-4 h-4" /> : 
