@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import FileUploader from '@/components/FileUploader';
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/button';
 const Index = () => {
   const { toast } = useToast();
   const [pdfContents, setPdfContents] = useState<PdfContent[]>([]);
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileNames, setFileNames] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,6 +33,7 @@ const Index = () => {
     setIsProcessing(true);
     const fileNameList = files.map(file => file.name);
     setFileNames(fileNameList);
+    setPdfFiles(files);
     
     try {
       const contents = await parseMultiplePdfs(files);
@@ -218,6 +221,7 @@ const Index = () => {
                 activeKeywords={activeKeywords}
                 onToggleHighlight={handleToggleHighlight}
                 onUpdateNextWord={handleUpdateNextWord}
+                pdfFiles={pdfFiles}
               />
             </div>
           </div>

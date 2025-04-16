@@ -14,6 +14,12 @@ export interface SearchResult {
   nextWord: string;
   fullContext: string;
   isHighlighted?: boolean;
+  boundingBox?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface PdfContent {
