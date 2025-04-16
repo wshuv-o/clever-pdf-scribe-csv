@@ -86,17 +86,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         
         // Check if any of our search terms are in this span
         filteredResults.forEach(result => {
-          if (spanText.toLowerCase().includes(result.match.toLowerCase())) {
+          if (result.match && spanText.toLowerCase().includes(result.match.toLowerCase())) {
             // Apply highlight style
             (span as HTMLElement).style.backgroundColor = getKeywordColor(result.match);
             (span as HTMLElement).style.color = 'white';
             (span as HTMLElement).dataset.resultId = result.id;
             (span as HTMLElement).style.cursor = 'pointer';
-            
-            // Add next word highlighting if present
-            if (result.nextWord && spanText.toLowerCase().includes(result.nextWord.toLowerCase())) {
-              (span as HTMLElement).style.backgroundColor = '#F97316';  // Amber highlight for next words
+          }
+          
+          // Explicitly check for next word matches - separate from the main keyword matches
+          if (result.nextWord && spanText.toLowerCase().includes(result.nextWord.toLowerCase())) {
+            // Only apply next word highlight if it's not already highlighted as a main keyword
+            if (!result.match || !spanText.toLowerCase().includes(result.match.toLowerCase())) {
+              (span as HTMLElement).style.backgroundColor = '#F97316'; // Amber highlight for next words
+              (span as HTMLElement).style.color = 'white';
               (span as HTMLElement).style.textDecoration = 'underline';
+              (span as HTMLElement).dataset.resultId = result.id;
+              (span as HTMLElement).dataset.isNextWord = 'true';
+              (span as HTMLElement).style.cursor = 'pointer';
             }
           }
         });
@@ -120,9 +127,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       if (selectedText && onUpdateNextWord) {
         onUpdateNextWord(resultId, selectedText);
         setSelectedText('');
+        setSelectionResultId(null);
       } else if (onToggleHighlight) {
         onToggleHighlight(resultId);
       }
+      
+      // Store the result ID when clicked for potential next word update
+      setSelectionResultId(resultId);
     }
   };
   
