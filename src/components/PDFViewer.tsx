@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -39,12 +40,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const [scale, setScale] = useState<number>(1.2);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [textLayerRendered, setTextLayerRendered] = useState<boolean>(false);
   
   // Filter results based on active PDF and keywords
   const filteredResults = searchResults.filter(result => {
     const matchesPdf = activePdfIndex === undefined || result.fileIndex === activePdfIndex;
     const matchesKeyword = activeKeywords.length === 0 || activeKeywords.includes(result.match);
-    return matchesPdf && matchesKeyword;
+    return matchesPdf && matchesKeyword && result.pageNumber === pageNumber;
   });
   
   // Active PDF file
@@ -53,7 +55,12 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   useEffect(() => {
     // Reset page number when changing PDFs
     setPageNumber(1);
+    setTextLayerRendered(false);
   }, [activePdfIndex]);
+  
+  useEffect(() => {
+    setTextLayerRendered(false);
+  }, [pageNumber]);
   
   useEffect(() => {
     const handleTextSelection = () => {
@@ -73,15 +80,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   
   // Apply highlights to the text layer
   useEffect(() => {
-    if (!textLayerRef.current || !filteredResults.length) return;
+    if (!textLayerRef.current || !filteredResults.length || !textLayerRendered) return;
     
     const applyHighlights = () => {
       const textLayer = textLayerRef.current;
       if (!textLayer) return;
       
+      console.log("Applying highlights to text layer...");
+      console.log("Results to highlight:", filteredResults);
+      
+      // Find all text spans in the text layer
+      const textSpans = Array.from(textLayer.querySelectorAll('.react-pdf__Page__textContent span'));
+      console.log(`Found ${textSpans.length} text spans in text layer`);
+      
       // Remove all previous highlights first
-      const allSpans = textLayer.querySelectorAll('.react-pdf__Page__textContent span');
-      allSpans.forEach(span => {
+      textSpans.forEach(span => {
         (span as HTMLElement).style.backgroundColor = '';
         (span as HTMLElement).style.color = '';
         (span as HTMLElement).style.cursor = '';
@@ -90,49 +103,65 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         delete (span as HTMLElement).dataset.isNextWord;
       });
       
-      // Find all text spans in the text layer
-      const textSpans = textLayer.querySelectorAll('.react-pdf__Page__textContent span');
-      
-      // Loop through all text spans
-      textSpans.forEach(span => {
-        const spanText = span.textContent || '';
+      // Create a function to highlight text within spans
+      const highlightTermInSpans = (term: string, spans: HTMLElement[], resultId: string, color: string, isNextWord: boolean = false) => {
+        if (!term) return;
         
-        // Check if any of our search terms are in this span
-        filteredResults.forEach(result => {
-          // Only highlight if isHighlighted is true
-          if (result.isHighlighted) {
-            if (result.match && spanText.toLowerCase().includes(result.match.toLowerCase())) {
-              // Apply highlight style
-              (span as HTMLElement).style.backgroundColor = getKeywordColor(result.match);
-              (span as HTMLElement).style.color = 'white';
-              (span as HTMLElement).dataset.resultId = result.id;
-              (span as HTMLElement).style.cursor = 'pointer';
+        const termLower = term.toLowerCase();
+        let found = false;
+        
+        spans.forEach(span => {
+          const text = span.textContent || '';
+          if (text.toLowerCase().includes(termLower)) {
+            span.style.backgroundColor = color;
+            span.style.color = 'white';
+            span.dataset.resultId = resultId;
+            span.style.cursor = 'pointer';
+            
+            if (isNextWord) {
+              span.style.textDecoration = 'underline';
+              span.dataset.isNextWord = 'true';
             }
             
-            // Explicitly check for next word matches - separate from the main keyword matches
-            if (result.nextWord && spanText.toLowerCase().includes(result.nextWord.toLowerCase())) {
-              // Only apply next word highlight if it's not already highlighted as a main keyword
-              if (!result.match || !spanText.toLowerCase().includes(result.match.toLowerCase())) {
-                (span as HTMLElement).style.backgroundColor = '#F97316'; // Amber highlight for next words
-                (span as HTMLElement).style.color = 'white';
-                (span as HTMLElement).style.textDecoration = 'underline';
-                (span as HTMLElement).dataset.resultId = result.id;
-                (span as HTMLElement).dataset.isNextWord = 'true';
-                (span as HTMLElement).style.cursor = 'pointer';
-              }
-            }
+            found = true;
+            console.log(`Highlighted term "${term}" in span: ${text}`);
           }
         });
+        
+        return found;
+      };
+      
+      // Loop through filtered results and apply highlights
+      filteredResults.forEach(result => {
+        if (result.isHighlighted) {
+          // Convert spans to HTMLElement array for easier manipulation
+          const htmlSpans = textSpans.map(span => span as HTMLElement);
+          
+          // Highlight main search term
+          const mainColor = getKeywordColor(result.match);
+          const mainTermHighlighted = highlightTermInSpans(result.match, htmlSpans, result.id, mainColor);
+          
+          // Highlight next word with amber color if it exists and is different from the main term
+          if (result.nextWord && result.nextWord.toLowerCase() !== result.match.toLowerCase()) {
+            const nextWordHighlighted = highlightTermInSpans(result.nextWord, htmlSpans, result.id, '#F97316', true);
+            console.log(`Next word "${result.nextWord}" highlight status:`, nextWordHighlighted);
+          }
+        }
       });
     };
     
     // Add a small delay to ensure the text layer is fully rendered
-    const timer = setTimeout(applyHighlights, 500);
+    const timer = setTimeout(applyHighlights, 1000);
     return () => clearTimeout(timer);
-  }, [filteredResults, pageNumber, numPages]);
+  }, [filteredResults, textLayerRendered]);
   
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+  };
+  
+  const onTextLayerRender = () => {
+    console.log("Text layer rendered for page", pageNumber);
+    setTextLayerRendered(true);
   };
   
   const handleTextLayerClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -275,12 +304,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                 scale={scale}
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
-                customTextRenderer={({ str, itemIndex }) => {
-                  return str;
-                }}
-                onGetTextSuccess={(textContent) => {
-                  // Handle text content if needed
-                }}
+                onGetTextSuccess={onTextLayerRender}
               >
                 <div 
                   ref={textLayerRef} 
