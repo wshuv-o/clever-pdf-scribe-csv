@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -39,12 +38,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const [selectionResultId, setSelectionResultId] = useState<string | null>(null);
   const [scale, setScale] = useState<number>(1.2);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
   
   // Filter results based on active PDF and keywords
   const filteredResults = searchResults.filter(result => {
     const matchesPdf = activePdfIndex === undefined || result.fileIndex === activePdfIndex;
     const matchesKeyword = activeKeywords.length === 0 || activeKeywords.includes(result.match);
-    return matchesPdf && matchesKeyword && result.isHighlighted;
+    return matchesPdf && matchesKeyword;
   });
   
   // Active PDF file
@@ -57,9 +57,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   
   useEffect(() => {
     const handleTextSelection = () => {
-      const selection = window.getSelection();
-      if (selection && selection.toString().trim()) {
-        setSelectedText(selection.toString().trim());
+      if (isSelectionMode) {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          setSelectedText(selection.toString().trim());
+        }
       }
     };
     
@@ -67,7 +69,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     return () => {
       document.removeEventListener('mouseup', handleTextSelection);
     };
-  }, []);
+  }, [isSelectionMode]);
   
   // Apply highlights to the text layer
   useEffect(() => {
@@ -76,6 +78,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     const applyHighlights = () => {
       const textLayer = textLayerRef.current;
       if (!textLayer) return;
+      
+      // Remove all previous highlights first
+      const allSpans = textLayer.querySelectorAll('.react-pdf__Page__textContent span');
+      allSpans.forEach(span => {
+        (span as HTMLElement).style.backgroundColor = '';
+        (span as HTMLElement).style.color = '';
+        (span as HTMLElement).style.cursor = '';
+        (span as HTMLElement).style.textDecoration = '';
+        delete (span as HTMLElement).dataset.resultId;
+        delete (span as HTMLElement).dataset.isNextWord;
+      });
       
       // Find all text spans in the text layer
       const textSpans = textLayer.querySelectorAll('.react-pdf__Page__textContent span');
@@ -86,24 +99,27 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         
         // Check if any of our search terms are in this span
         filteredResults.forEach(result => {
-          if (result.match && spanText.toLowerCase().includes(result.match.toLowerCase())) {
-            // Apply highlight style
-            (span as HTMLElement).style.backgroundColor = getKeywordColor(result.match);
-            (span as HTMLElement).style.color = 'white';
-            (span as HTMLElement).dataset.resultId = result.id;
-            (span as HTMLElement).style.cursor = 'pointer';
-          }
-          
-          // Explicitly check for next word matches - separate from the main keyword matches
-          if (result.nextWord && spanText.toLowerCase().includes(result.nextWord.toLowerCase())) {
-            // Only apply next word highlight if it's not already highlighted as a main keyword
-            if (!result.match || !spanText.toLowerCase().includes(result.match.toLowerCase())) {
-              (span as HTMLElement).style.backgroundColor = '#F97316'; // Amber highlight for next words
+          // Only highlight if isHighlighted is true
+          if (result.isHighlighted) {
+            if (result.match && spanText.toLowerCase().includes(result.match.toLowerCase())) {
+              // Apply highlight style
+              (span as HTMLElement).style.backgroundColor = getKeywordColor(result.match);
               (span as HTMLElement).style.color = 'white';
-              (span as HTMLElement).style.textDecoration = 'underline';
               (span as HTMLElement).dataset.resultId = result.id;
-              (span as HTMLElement).dataset.isNextWord = 'true';
               (span as HTMLElement).style.cursor = 'pointer';
+            }
+            
+            // Explicitly check for next word matches - separate from the main keyword matches
+            if (result.nextWord && spanText.toLowerCase().includes(result.nextWord.toLowerCase())) {
+              // Only apply next word highlight if it's not already highlighted as a main keyword
+              if (!result.match || !spanText.toLowerCase().includes(result.match.toLowerCase())) {
+                (span as HTMLElement).style.backgroundColor = '#F97316'; // Amber highlight for next words
+                (span as HTMLElement).style.color = 'white';
+                (span as HTMLElement).style.textDecoration = 'underline';
+                (span as HTMLElement).dataset.resultId = result.id;
+                (span as HTMLElement).dataset.isNextWord = 'true';
+                (span as HTMLElement).style.cursor = 'pointer';
+              }
             }
           }
         });
@@ -124,16 +140,25 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     const resultId = target.dataset.resultId;
     
     if (resultId) {
-      if (selectedText && onUpdateNextWord) {
-        onUpdateNextWord(resultId, selectedText);
+      if (isSelectionMode && selectedText) {
+        onUpdateNextWord && onUpdateNextWord(resultId, selectedText);
         setSelectedText('');
         setSelectionResultId(null);
-      } else if (onToggleHighlight) {
-        onToggleHighlight(resultId);
+        setIsSelectionMode(false);
+      } else {
+        // Toggle highlight off when clicking on a highlighted element
+        onToggleHighlight && onToggleHighlight(resultId);
+        // Enter selection mode after toggle
+        setIsSelectionMode(true);
+        setSelectionResultId(resultId);
       }
-      
-      // Store the result ID when clicked for potential next word update
-      setSelectionResultId(resultId);
+    } else if (isSelectionMode) {
+      // If clicking outside a highlight while in selection mode
+      // Just keep the selection mode active
+    } else {
+      // Reset selection mode when clicking on non-highlighted text
+      setIsSelectionMode(false);
+      setSelectionResultId(null);
     }
   };
   
@@ -187,19 +212,47 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       </div>
       
       <div className="flex-1 overflow-auto bg-gray-900 flex items-center justify-center">
-        {selectedText && (
-          <div className="sticky top-0 z-10 flex items-center gap-2 p-2 mb-4 bg-gray-800 rounded-md">
-            <span className="text-sm text-gray-200">Selected: "{selectedText}"</span>
-            {selectionResultId && (
-              <Button 
-                className="px-2 py-1 text-xs bg-amber-600 rounded hover:bg-amber-700"
-                onClick={() => onUpdateNextWord && onUpdateNextWord(selectionResultId, selectedText)}
-              >
-                Set as next word
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="sticky top-0 z-10 p-2 w-full bg-gray-800/90 flex justify-between items-center">
+          {isSelectionMode ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-amber-300">Selection mode active - select text for next word</span>
+              {selectedText && (
+                <span className="text-sm text-white">Selected: "{selectedText}"</span>
+              )}
+              {selectionResultId && selectedText && (
+                <Button 
+                  className="px-2 py-1 text-xs bg-amber-600 rounded hover:bg-amber-700"
+                  onClick={() => {
+                    onUpdateNextWord && onUpdateNextWord(selectionResultId, selectedText);
+                    setSelectedText('');
+                    setSelectionResultId(null);
+                    setIsSelectionMode(false);
+                  }}
+                >
+                  Set as next word
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-300">
+              Click on highlighted text to edit or select new text
+            </div>
+          )}
+          
+          {isSelectionMode && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsSelectionMode(false);
+                setSelectionResultId(null);
+                setSelectedText('');
+              }}
+              className="text-xs"
+            >
+              Cancel Selection
+            </Button>
+          )}
+        </div>
         
         {activePdf ? (
           <div className="pdf-container my-4 mx-auto">
@@ -233,6 +286,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                   ref={textLayerRef} 
                   onClick={handleTextLayerClick}
                   className="react-pdf__Page__textContent absolute top-0 left-0 z-10"
+                  style={{ userSelect: isSelectionMode ? 'text' : 'none' }}
                 />
               </Page>
             </Document>
