@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -42,18 +41,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
   const [textLayerRendered, setTextLayerRendered] = useState<boolean>(false);
   
-  // Filter results based on active PDF and keywords
   const filteredResults = searchResults.filter(result => {
     const matchesPdf = activePdfIndex === undefined || result.fileIndex === activePdfIndex;
     const matchesKeyword = activeKeywords.length === 0 || activeKeywords.includes(result.match);
     return matchesPdf && matchesKeyword && result.pageNumber === pageNumber;
   });
   
-  // Active PDF file
   const activePdf = pdfFiles && activePdfIndex !== undefined ? pdfFiles[activePdfIndex] : null;
   
   useEffect(() => {
-    // Reset page number when changing PDFs
     setPageNumber(1);
     setTextLayerRendered(false);
   }, [activePdfIndex]);
@@ -78,7 +74,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     };
   }, [isSelectionMode]);
   
-  // Apply highlights to the text layer
   useEffect(() => {
     if (!textLayerRef.current || !filteredResults.length || !textLayerRendered) return;
     
@@ -88,27 +83,22 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       
       console.log("Applying highlights to text layer...");
       
-      // Remove all previous highlights first
       const previousHighlights = textLayer.querySelectorAll('.pdf-text-highlight, .pdf-next-word-highlight');
       previousHighlights.forEach(highlight => highlight.remove());
       
-      // Find all text spans in the text layer
       const textSpans = Array.from(textLayer.querySelectorAll('.react-pdf__Page__textContent span'));
       console.log(`Found ${textSpans.length} text spans in text layer`);
       
-      // Loop through filtered results and apply highlights
       filteredResults.forEach(result => {
         if (!result.isHighlighted) return;
         
         const mainTermLower = result.match.toLowerCase();
         const nextWordLower = result.nextWord ? result.nextWord.toLowerCase() : '';
         
-        // Helper function to create highlight overlay
         const createHighlightOverlay = (span: Element, text: string, isMatch: boolean, resultId: string, isNextWord: boolean = false) => {
           const spanRect = span.getBoundingClientRect();
           const textLayerRect = textLayer.getBoundingClientRect();
           
-          // Create highlight element
           const highlight = document.createElement('div');
           highlight.className = isNextWord ? 'pdf-next-word-highlight' : 'pdf-text-highlight';
           highlight.style.position = 'absolute';
@@ -127,10 +117,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             highlight.style.textDecorationThickness = '2px';
           }
           
-          // Store result ID as data attribute
           highlight.dataset.resultId = resultId;
           
-          // Add click handler
           highlight.addEventListener('click', () => {
             const event = new CustomEvent('highlightClick', { 
               detail: { resultId } 
@@ -141,17 +129,14 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           textLayer.appendChild(highlight);
         };
         
-        // Check each text span for matches
         textSpans.forEach(span => {
           const spanText = span.textContent || '';
           const spanTextLower = spanText.toLowerCase();
           
-          // Check for main term match
           if (spanTextLower.includes(mainTermLower)) {
             createHighlightOverlay(span, spanText, true, result.id, false);
           }
           
-          // Check for next word match if it exists and is different from the main term
           if (nextWordLower && nextWordLower !== mainTermLower && spanTextLower.includes(nextWordLower)) {
             createHighlightOverlay(span, spanText, false, result.id, true);
           }
@@ -159,10 +144,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       });
     };
     
-    // Add a delay to ensure the text layer is fully rendered and positioned correctly
     const timer = setTimeout(applyHighlights, 800);
     
-    // Add custom event listener for highlight clicks
     const handleHighlightClick = (event: any) => {
       const resultId = event.detail.resultId;
       if (isSelectionMode && selectedText) {
@@ -196,7 +179,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     setTextLayerRendered(true);
   };
   
-  // Get color for a keyword
   const getKeywordColor = (term: string, withOpacity = false) => {
     const allKeywords = Array.from(new Set(searchResults.map(result => result.match)));
     const index = allKeywords.indexOf(term) % 5;
@@ -234,6 +216,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   }
 
   const fileName = activeFile || fileNames[activePdfIndex !== undefined ? activePdfIndex : 0];
+
+  const highlightStyles = `
+    .pdf-text-highlight {
+      pointer-events: all !important;
+      mix-blend-mode: multiply;
+    }
+    .pdf-next-word-highlight {
+      pointer-events: all !important;
+      mix-blend-mode: multiply;
+    }
+    .react-pdf__Page {
+      position: relative;
+    }
+    .react-pdf__Page__textContent {
+      user-select: ${isSelectionMode ? 'text' : 'none'};
+      pointer-events: ${isSelectionMode ? 'auto' : 'none'};
+    }
+  `;
 
   return (
     <div className="flex flex-col h-full bg-[#0d1117] border border-gray-800 rounded-md overflow-hidden">
@@ -291,24 +291,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           )}
         </div>
         
-        {/* Main PDF Display with Custom Highlighting */}
-        <style jsx>{`
-          .pdf-text-highlight {
-            pointer-events: all !important;
-            mix-blend-mode: multiply;
-          }
-          .pdf-next-word-highlight {
-            pointer-events: all !important;
-            mix-blend-mode: multiply;
-          }
-          .react-pdf__Page {
-            position: relative;
-          }
-          .react-pdf__Page__textContent {
-            user-select: ${isSelectionMode ? 'text' : 'none'};
-            pointer-events: ${isSelectionMode ? 'auto' : 'none'};
-          }
-        `}</style>
+        <style>{highlightStyles}</style>
         
         {activePdf ? (
           <div className="pdf-container my-4 mx-auto">
@@ -348,7 +331,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         )}
       </div>
       
-      {/* Pagination Controls */}
       {numPages > 0 && (
         <div className="flex items-center justify-between p-2 bg-[#171923] border-t border-gray-800">
           <Button
@@ -377,7 +359,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         </div>
       )}
       
-      {/* PDF Selector */}
       {fileNames.length > 0 && (
         <div className="flex items-center justify-center p-2 bg-[#171923] border-t border-gray-800 gap-2 overflow-x-auto">
           <div 
