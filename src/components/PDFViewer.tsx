@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -60,11 +61,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   
   useEffect(() => {
     const handleTextSelection = () => {
-      if (isSelectionMode) {
-        const selection = window.getSelection();
-        if (selection && selection.toString().trim()) {
-          setSelectedText(selection.toString().trim());
-        }
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim()) {
+        setSelectedText(selection.toString().trim());
       }
     };
     
@@ -72,7 +71,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     return () => {
       document.removeEventListener('mouseup', handleTextSelection);
     };
-  }, [isSelectionMode]);
+  }, []);
   
   useEffect(() => {
     if (!textLayerRef.current || !filteredResults.length || !textLayerRendered) return;
@@ -230,8 +229,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       position: relative;
     }
     .react-pdf__Page__textContent {
-      user-select: ${isSelectionMode ? 'text' : 'none'};
-      pointer-events: ${isSelectionMode ? 'auto' : 'none'};
+      user-select: text;
+      pointer-events: auto;
     }
   `;
 
