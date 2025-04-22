@@ -87,73 +87,105 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       if (!textLayer) return;
       
       console.log("Applying highlights to text layer...");
-      console.log("Results to highlight:", filteredResults);
+      
+      // Remove all previous highlights first
+      const previousHighlights = textLayer.querySelectorAll('.pdf-text-highlight, .pdf-next-word-highlight');
+      previousHighlights.forEach(highlight => highlight.remove());
       
       // Find all text spans in the text layer
       const textSpans = Array.from(textLayer.querySelectorAll('.react-pdf__Page__textContent span'));
       console.log(`Found ${textSpans.length} text spans in text layer`);
       
-      // Remove all previous highlights first
-      textSpans.forEach(span => {
-        (span as HTMLElement).style.backgroundColor = '';
-        (span as HTMLElement).style.color = '';
-        (span as HTMLElement).style.cursor = '';
-        (span as HTMLElement).style.textDecoration = '';
-        delete (span as HTMLElement).dataset.resultId;
-        delete (span as HTMLElement).dataset.isNextWord;
-      });
-      
-      // Create a function to highlight text within spans
-      const highlightTermInSpans = (term: string, spans: HTMLElement[], resultId: string, color: string, isNextWord: boolean = false) => {
-        if (!term) return;
-        
-        const termLower = term.toLowerCase();
-        let found = false;
-        
-        spans.forEach(span => {
-          const text = span.textContent || '';
-          if (text.toLowerCase().includes(termLower)) {
-            span.style.backgroundColor = color;
-            span.style.color = 'white';
-            span.dataset.resultId = resultId;
-            span.style.cursor = 'pointer';
-            
-            if (isNextWord) {
-              span.style.textDecoration = 'underline';
-              span.dataset.isNextWord = 'true';
-            }
-            
-            found = true;
-            console.log(`Highlighted term "${term}" in span: ${text}`);
-          }
-        });
-        
-        return found;
-      };
-      
       // Loop through filtered results and apply highlights
       filteredResults.forEach(result => {
-        if (result.isHighlighted) {
-          // Convert spans to HTMLElement array for easier manipulation
-          const htmlSpans = textSpans.map(span => span as HTMLElement);
+        if (!result.isHighlighted) return;
+        
+        const mainTermLower = result.match.toLowerCase();
+        const nextWordLower = result.nextWord ? result.nextWord.toLowerCase() : '';
+        
+        // Helper function to create highlight overlay
+        const createHighlightOverlay = (span: Element, text: string, isMatch: boolean, resultId: string, isNextWord: boolean = false) => {
+          const spanRect = span.getBoundingClientRect();
+          const textLayerRect = textLayer.getBoundingClientRect();
           
-          // Highlight main search term
-          const mainColor = getKeywordColor(result.match);
-          const mainTermHighlighted = highlightTermInSpans(result.match, htmlSpans, result.id, mainColor);
+          // Create highlight element
+          const highlight = document.createElement('div');
+          highlight.className = isNextWord ? 'pdf-next-word-highlight' : 'pdf-text-highlight';
+          highlight.style.position = 'absolute';
+          highlight.style.left = `${spanRect.left - textLayerRect.left}px`;
+          highlight.style.top = `${spanRect.top - textLayerRect.top}px`;
+          highlight.style.width = `${spanRect.width}px`;
+          highlight.style.height = `${spanRect.height}px`;
+          highlight.style.backgroundColor = isNextWord ? 'rgba(245, 158, 11, 0.5)' : getKeywordColor(result.match, true);
+          highlight.style.pointerEvents = 'all';
+          highlight.style.cursor = 'pointer';
+          highlight.style.zIndex = '1';
           
-          // Highlight next word with amber color if it exists and is different from the main term
-          if (result.nextWord && result.nextWord.toLowerCase() !== result.match.toLowerCase()) {
-            const nextWordHighlighted = highlightTermInSpans(result.nextWord, htmlSpans, result.id, '#F97316', true);
-            console.log(`Next word "${result.nextWord}" highlight status:`, nextWordHighlighted);
+          if (isNextWord) {
+            highlight.style.textDecoration = 'underline';
+            highlight.style.textDecorationColor = '#F59E0B';
+            highlight.style.textDecorationThickness = '2px';
           }
-        }
+          
+          // Store result ID as data attribute
+          highlight.dataset.resultId = resultId;
+          
+          // Add click handler
+          highlight.addEventListener('click', () => {
+            const event = new CustomEvent('highlightClick', { 
+              detail: { resultId } 
+            });
+            textLayer.dispatchEvent(event);
+          });
+          
+          textLayer.appendChild(highlight);
+        };
+        
+        // Check each text span for matches
+        textSpans.forEach(span => {
+          const spanText = span.textContent || '';
+          const spanTextLower = spanText.toLowerCase();
+          
+          // Check for main term match
+          if (spanTextLower.includes(mainTermLower)) {
+            createHighlightOverlay(span, spanText, true, result.id, false);
+          }
+          
+          // Check for next word match if it exists and is different from the main term
+          if (nextWordLower && nextWordLower !== mainTermLower && spanTextLower.includes(nextWordLower)) {
+            createHighlightOverlay(span, spanText, false, result.id, true);
+          }
+        });
       });
     };
     
-    // Add a small delay to ensure the text layer is fully rendered
-    const timer = setTimeout(applyHighlights, 1000);
-    return () => clearTimeout(timer);
-  }, [filteredResults, textLayerRendered]);
+    // Add a delay to ensure the text layer is fully rendered and positioned correctly
+    const timer = setTimeout(applyHighlights, 800);
+    
+    // Add custom event listener for highlight clicks
+    const handleHighlightClick = (event: any) => {
+      const resultId = event.detail.resultId;
+      if (isSelectionMode && selectedText) {
+        onUpdateNextWord && onUpdateNextWord(resultId, selectedText);
+        setSelectedText('');
+        setSelectionResultId(null);
+        setIsSelectionMode(false);
+      } else {
+        onToggleHighlight && onToggleHighlight(resultId);
+        setIsSelectionMode(true);
+        setSelectionResultId(resultId);
+      }
+    };
+    
+    textLayerRef.current.addEventListener('highlightClick', handleHighlightClick);
+    
+    return () => {
+      clearTimeout(timer);
+      if (textLayerRef.current) {
+        textLayerRef.current.removeEventListener('highlightClick', handleHighlightClick);
+      }
+    };
+  }, [filteredResults, textLayerRendered, isSelectionMode, selectedText, onToggleHighlight, onUpdateNextWord]);
   
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -164,44 +196,18 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     setTextLayerRendered(true);
   };
   
-  const handleTextLayerClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    const resultId = target.dataset.resultId;
-    
-    if (resultId) {
-      if (isSelectionMode && selectedText) {
-        onUpdateNextWord && onUpdateNextWord(resultId, selectedText);
-        setSelectedText('');
-        setSelectionResultId(null);
-        setIsSelectionMode(false);
-      } else {
-        // Toggle highlight off when clicking on a highlighted element
-        onToggleHighlight && onToggleHighlight(resultId);
-        // Enter selection mode after toggle
-        setIsSelectionMode(true);
-        setSelectionResultId(resultId);
-      }
-    } else if (isSelectionMode) {
-      // If clicking outside a highlight while in selection mode
-      // Just keep the selection mode active
-    } else {
-      // Reset selection mode when clicking on non-highlighted text
-      setIsSelectionMode(false);
-      setSelectionResultId(null);
-    }
-  };
-  
   // Get color for a keyword
-  const getKeywordColor = (term: string) => {
+  const getKeywordColor = (term: string, withOpacity = false) => {
     const allKeywords = Array.from(new Set(searchResults.map(result => result.match)));
     const index = allKeywords.indexOf(term) % 5;
-    return [
-      '#3B82F6', // blue
-      '#10B981', // green
-      '#8B5CF6', // purple
-      '#EC4899', // pink
-      '#F59E0B'  // amber
-    ][index];
+    const colors = [
+      withOpacity ? 'rgba(59, 130, 246, 0.5)' : '#3B82F6', // blue
+      withOpacity ? 'rgba(16, 185, 129, 0.5)' : '#10B981', // green
+      withOpacity ? 'rgba(139, 92, 246, 0.5)' : '#8B5CF6', // purple
+      withOpacity ? 'rgba(236, 72, 153, 0.5)' : '#EC4899', // pink
+      withOpacity ? 'rgba(245, 158, 11, 0.5)' : '#F59E0B'  // amber
+    ];
+    return colors[index];
   };
   
   const nextPage = () => {
@@ -231,6 +237,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[#0d1117] border border-gray-800 rounded-md overflow-hidden">
+      {/* Header styles */}
       <div className="p-4 bg-[#171923] border-b border-gray-800 flex items-center justify-between">
         <h2 className="text-lg font-medium text-white truncate">{fileName}</h2>
         <div className="flex items-center gap-2">
@@ -241,6 +248,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       </div>
       
       <div className="flex-1 overflow-auto bg-gray-900 flex items-center justify-center">
+        {/* Selection mode status bar */}
         <div className="sticky top-0 z-10 p-2 w-full bg-gray-800/90 flex justify-between items-center">
           {isSelectionMode ? (
             <div className="flex items-center gap-2">
@@ -283,6 +291,25 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           )}
         </div>
         
+        {/* Main PDF Display with Custom Highlighting */}
+        <style jsx>{`
+          .pdf-text-highlight {
+            pointer-events: all !important;
+            mix-blend-mode: multiply;
+          }
+          .pdf-next-word-highlight {
+            pointer-events: all !important;
+            mix-blend-mode: multiply;
+          }
+          .react-pdf__Page {
+            position: relative;
+          }
+          .react-pdf__Page__textContent {
+            user-select: ${isSelectionMode ? 'text' : 'none'};
+            pointer-events: ${isSelectionMode ? 'auto' : 'none'};
+          }
+        `}</style>
+        
         {activePdf ? (
           <div className="pdf-container my-4 mx-auto">
             <Document
@@ -305,12 +332,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
                 onGetTextSuccess={onTextLayerRender}
+                className="position-relative"
               >
                 <div 
                   ref={textLayerRef} 
-                  onClick={handleTextLayerClick}
-                  className="react-pdf__Page__textContent absolute top-0 left-0 z-10"
-                  style={{ userSelect: isSelectionMode ? 'text' : 'none' }}
+                  className="react-pdf__Page__textContent absolute top-0 left-0 w-full h-full"
                 />
               </Page>
             </Document>
@@ -322,6 +348,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         )}
       </div>
       
+      {/* Pagination Controls */}
       {numPages > 0 && (
         <div className="flex items-center justify-between p-2 bg-[#171923] border-t border-gray-800">
           <Button
@@ -350,6 +377,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         </div>
       )}
       
+      {/* PDF Selector */}
       {fileNames.length > 0 && (
         <div className="flex items-center justify-center p-2 bg-[#171923] border-t border-gray-800 gap-2 overflow-x-auto">
           <div 
