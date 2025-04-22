@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -80,95 +79,65 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       const textLayer = textLayerRef.current;
       if (!textLayer) return;
       
-      console.log("Applying highlights to text layer...");
-      
-      const previousHighlights = textLayer.querySelectorAll('.pdf-text-highlight, .pdf-next-word-highlight');
+      // Remove any existing highlights
+      const previousHighlights = textLayer.querySelectorAll('.pdf-highlight');
       previousHighlights.forEach(highlight => highlight.remove());
       
-      const textSpans = Array.from(textLayer.querySelectorAll('.react-pdf__Page__textContent span'));
-      console.log(`Found ${textSpans.length} text spans in text layer`);
+      // Get all text elements from the PDF
+      const textElements = Array.from(textLayer.getElementsByClassName('react-pdf__Page__textContent'));
       
       filteredResults.forEach(result => {
         if (!result.isHighlighted) return;
         
-        const mainTermLower = result.match.toLowerCase();
-        const nextWordLower = result.nextWord ? result.nextWord.toLowerCase() : '';
+        const searchTerm = result.match.toLowerCase();
         
-        const createHighlightOverlay = (span: Element, text: string, isMatch: boolean, resultId: string, isNextWord: boolean = false) => {
-          const spanRect = span.getBoundingClientRect();
-          const textLayerRect = textLayer.getBoundingClientRect();
+        textElements.forEach(textElement => {
+          const walker = document.createTreeWalker(
+            textElement,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
           
-          const highlight = document.createElement('div');
-          highlight.className = isNextWord ? 'pdf-next-word-highlight' : 'pdf-text-highlight';
-          highlight.style.position = 'absolute';
-          highlight.style.left = `${spanRect.left - textLayerRect.left}px`;
-          highlight.style.top = `${spanRect.top - textLayerRect.top}px`;
-          highlight.style.width = `${spanRect.width}px`;
-          highlight.style.height = `${spanRect.height}px`;
-          highlight.style.backgroundColor = isNextWord ? 'rgba(245, 158, 11, 0.5)' : getKeywordColor(result.match, true);
-          highlight.style.pointerEvents = 'all';
-          highlight.style.cursor = 'pointer';
-          highlight.style.zIndex = '1';
-          
-          if (isNextWord) {
-            highlight.style.textDecoration = 'underline';
-            highlight.style.textDecorationColor = '#F59E0B';
-            highlight.style.textDecorationThickness = '2px';
-          }
-          
-          highlight.dataset.resultId = resultId;
-          
-          highlight.addEventListener('click', () => {
-            const event = new CustomEvent('highlightClick', { 
-              detail: { resultId } 
-            });
-            textLayer.dispatchEvent(event);
-          });
-          
-          textLayer.appendChild(highlight);
-        };
-        
-        textSpans.forEach(span => {
-          const spanText = span.textContent || '';
-          const spanTextLower = spanText.toLowerCase();
-          
-          if (spanTextLower.includes(mainTermLower)) {
-            createHighlightOverlay(span, spanText, true, result.id, false);
-          }
-          
-          if (nextWordLower && nextWordLower !== mainTermLower && spanTextLower.includes(nextWordLower)) {
-            createHighlightOverlay(span, spanText, false, result.id, true);
+          let node;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent || '';
+            const lowerText = text.toLowerCase();
+            let position = lowerText.indexOf(searchTerm);
+            
+            while (position !== -1) {
+              const range = document.createRange();
+              range.setStart(node, position);
+              range.setEnd(node, position + searchTerm.length);
+              
+              const rect = range.getBoundingClientRect();
+              const highlight = document.createElement('div');
+              highlight.className = 'pdf-highlight';
+              highlight.style.position = 'absolute';
+              highlight.style.left = `${rect.left - textLayer.getBoundingClientRect().left}px`;
+              highlight.style.top = `${rect.top - textLayer.getBoundingClientRect().top}px`;
+              highlight.style.width = `${rect.width}px`;
+              highlight.style.height = `${rect.height}px`;
+              highlight.style.backgroundColor = 'rgba(139, 92, 246, 0.5)'; // Bright purple with opacity
+              highlight.style.mixBlendMode = 'multiply';
+              highlight.style.pointerEvents = 'none';
+              
+              textLayer.appendChild(highlight);
+              
+              position = lowerText.indexOf(searchTerm, position + 1);
+            }
           }
         });
       });
     };
     
-    const timer = setTimeout(applyHighlights, 800);
-    
-    const handleHighlightClick = (event: any) => {
-      const resultId = event.detail.resultId;
-      if (isSelectionMode && selectedText) {
-        onUpdateNextWord && onUpdateNextWord(resultId, selectedText);
-        setSelectedText('');
-        setSelectionResultId(null);
-        setIsSelectionMode(false);
-      } else {
-        onToggleHighlight && onToggleHighlight(resultId);
-        setIsSelectionMode(true);
-        setSelectionResultId(resultId);
-      }
-    };
-    
-    textLayerRef.current.addEventListener('highlightClick', handleHighlightClick);
+    // Apply highlights with a small delay to ensure PDF is rendered
+    const timer = setTimeout(applyHighlights, 100);
     
     return () => {
       clearTimeout(timer);
-      if (textLayerRef.current) {
-        textLayerRef.current.removeEventListener('highlightClick', handleHighlightClick);
-      }
     };
-  }, [filteredResults, textLayerRendered, isSelectionMode, selectedText, onToggleHighlight, onUpdateNextWord]);
-  
+  }, [filteredResults, textLayerRendered, pageNumber]);
+
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
   };
