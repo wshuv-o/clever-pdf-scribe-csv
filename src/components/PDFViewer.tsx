@@ -7,8 +7,10 @@ import { SearchResult } from '@/utils/pdfUtils';
 import { Button } from '@/components/ui/button';
 import { PDFControls } from './pdf/PDFControls';
 import { PDFFileSelector } from './pdf/PDFFileSelector';
+import { PDFSelectionMode } from './pdf/PDFSelectionMode';
 import { usePDFNavigation } from '@/hooks/usePDFNavigation';
 import { usePDFHighlight } from '@/hooks/usePDFHighlight';
+import { usePDFTextSelection } from '@/hooks/usePDFTextSelection';
 
 // Set up PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -37,10 +39,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   pdfFiles = []
 }) => {
   const [numPages, setNumPages] = useState<number>(0);
-  const [selectedText, setSelectedText] = useState('');
-  const [selectionResultId, setSelectionResultId] = useState<string | null>(null);
-  const textLayerRef = useRef<HTMLDivElement>(null);
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const [textLayerRendered, setTextLayerRendered] = useState<boolean>(false);
 
   const { pageNumber, scale, nextPage, prevPage, zoomIn, zoomOut } = usePDFNavigation({
@@ -53,6 +53,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     return matchesPdf && matchesKeyword && result.pageNumber === pageNumber;
   });
 
+  const { selectedText, selectionResultId, handleSelectionComplete, cancelSelection } = usePDFTextSelection({
+    isSelectionMode,
+    onUpdateNextWord
+  });
+
   usePDFHighlight({
     textLayerRef,
     filteredResults,
@@ -61,20 +66,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   });
 
   const activePdf = pdfFiles && activePdfIndex !== undefined ? pdfFiles[activePdfIndex] : null;
-
-  React.useEffect(() => {
-    const handleTextSelection = () => {
-      const selection = window.getSelection();
-      if (selection && selection.toString().trim()) {
-        setSelectedText(selection.toString().trim());
-      }
-    };
-
-    document.addEventListener('mouseup', handleTextSelection);
-    return () => {
-      document.removeEventListener('mouseup', handleTextSelection);
-    };
-  }, []);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -96,7 +87,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#0d1117] border border-gray-800 rounded-md overflow-hidden">
       <div className="p-4 bg-[#171923] border-b border-gray-800 flex items-center justify-between">
-        <h2 className="text-lg font-medium text-white truncate">{activeFile || fileNames[activePdfIndex !== undefined ? activePdfIndex : 0]}</h2>
+        <h2 className="text-lg font-medium text-white truncate">
+          {activeFile || fileNames[activePdfIndex !== undefined ? activePdfIndex : 0]}
+        </h2>
         <div className="flex items-center gap-2">
           <Button onClick={zoomOut} variant="ghost" size="icon" className="h-8 w-8">-</Button>
           <span className="text-sm text-gray-300">{Math.round(scale * 100)}%</span>
@@ -106,45 +99,12 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
       <div className="flex-1 overflow-auto bg-gray-900 flex items-center justify-center">
         <div className="sticky top-0 z-10 p-2 w-full bg-gray-800/90 flex justify-between items-center">
-          {isSelectionMode ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-amber-300">Selection mode active - select text for next word</span>
-              {selectedText && (
-                <span className="text-sm text-white">Selected: "{selectedText}"</span>
-              )}
-              {selectionResultId && selectedText && (
-                <Button 
-                  className="px-2 py-1 text-xs bg-amber-600 rounded hover:bg-amber-700"
-                  onClick={() => {
-                    onUpdateNextWord && onUpdateNextWord(selectionResultId, selectedText);
-                    setSelectedText('');
-                    setSelectionResultId(null);
-                    setIsSelectionMode(false);
-                  }}
-                >
-                  Set as next word
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-300">
-              Click on highlighted text to edit or select new text
-            </div>
-          )}
-
-          {isSelectionMode && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsSelectionMode(false);
-                setSelectionResultId(null);
-                setSelectedText('');
-              }}
-              className="text-xs"
-            >
-              Cancel Selection
-            </Button>
-          )}
+          <PDFSelectionMode
+            isSelectionMode={isSelectionMode}
+            selectedText={selectedText}
+            onSelectionComplete={handleSelectionComplete}
+            onCancel={cancelSelection}
+          />
         </div>
 
         <div className="pdf-container my-4 mx-auto">
